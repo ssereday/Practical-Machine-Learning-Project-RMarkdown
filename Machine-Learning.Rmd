@@ -1,0 +1,162 @@
+---
+title: "Practical Machine Learning Project"
+author: "Scott Sereday"
+date: "Thursday, January 22, 2015"
+output: html_document
+---
+
+I used 25% of the training table for data validation purposes.
+
+To solve the problem of missing data, I filled in the average value for each field. I also created indicator variables in place of the name field.
+
+My final valdiation table (using Boosting):
+---
+          A    B    C    D    E
+       A 1045    0    0    0    0
+       B    0  730    0    0    0
+       C    0    1  616    0    0
+       D    0    0    4  602    0
+       E    0    0    0    0  650
+---
+
+
+Based on the above table, I expect the error rate to be 0.14%.
+
+My final predictions are:
+---
+       ID Type
+       1 	B
+       2	A
+       3	B
+       4	A
+       5	A
+       6	E
+       7	D
+       8	B
+       9	A
+       10	A
+       11	B
+       12	C
+       13	B
+       14	A
+       15	E
+       16	E
+       17	A
+       18	B
+       19	B
+       20	B
+---
+
+I also used random forest, which actually produced perfect results in the cross validation. I also tried linear discriminate analysis, which was far less accurate.
+
+My code:
+```
+set.seed(3433)
+library(AppliedPredictiveModeling)
+library(ISLR)
+library(ggplot2)
+library(caret)
+library(Hmisc)
+
+#READING IN DATA
+training <- read.csv(file="C:/Users/Scott/Documents/Career/coursera/Machine Learning/pml-training.csv",head=TRUE,sep=",",na.strings= c("999", "NA", " ", "","#DIV/0!"))
+testing <- read.csv(file="C:/Users/Scott/Documents/Career/coursera/Machine Learning/pml-testing.csv",head=TRUE,sep=",",na.strings= c("999", "NA", " ", "","#DIV/0!"))
+
+#CREATING VALIDATION DATA
+inTrain = createDataPartition(training$classe, p = 3/4)[[1]]
+training = training[ inTrain,]
+validation = training[-inTrain,]
+
+#STUDYING DATA CHARACTERISTICS
+describe(training)
+
+#CREATING INDICATOR VARIABLES FOR NAMES
+adelmotrain <- 0
+adelmotrain <- training$user_name == 'adelmo'
+adelmotrain[adelmotrain==TRUE] = 1
+adelmotest <- testing$user_name == 'adelmo'
+adelmotest[adelmotest==TRUE] = 1
+adelmovalidation <- validation$user_name == 'adelmo'
+adelmovalidation[adelmovalidation==TRUE] = 1
+carlitos <- 0
+carlitostrain <- training$user_name == 'carlitos'
+carlitostrain[carlitostrain==TRUE] = 1
+carlitostest <- testing$user_name == 'carlitos'
+carlitostest[carlitostest==TRUE] = 1
+carlitosvalidation <- validation$user_name == 'carlitos'
+carlitosvalidation[carlitosvalidation==TRUE] = 1
+charles <- 0
+charlestrain <- training$user_name == 'charles'
+charlestrain[charlestrain==TRUE] = 1
+charlestest <- testing$user_name == 'charles'
+charlestest[charlestest==TRUE] = 1
+charlesvalidation <- validation$user_name == 'charles'
+charlesvalidation[charlesvalidation==TRUE] = 1
+eurico <- 0
+euricotrain <- training$user_name == 'eurico'
+euricotrain[euricotrain==TRUE] = 1
+euricotest <- testing$user_name == 'eurico'
+euricotest[euricotest==TRUE] = 1
+euricovalidation <- validation$user_name == 'eurico'
+euricovalidation[euricovalidation==TRUE] = 1
+jeremy <- 0
+jeremytrain <- training$user_name == 'jeremy'
+jeremytrain[jeremytrain==TRUE] = 1
+jeremytest <- testing$user_name == 'jeremy'
+jeremytest[jeremytest==TRUE] = 1
+jeremyvalidation <- validation$user_name == 'jeremy'
+jeremyvalidation[jeremyvalidation==TRUE] = 1
+
+#REMOVING VARIABLES THAT ARE UNNEEDED OR ALL NULL IN TEST SET
+training <- subset( training, select = -c(X,cvtd_timestamp,new_window,user_name,kurtosis_yaw_belt,skewness_yaw_belt,kurtosis_yaw_dumbbell,skewness_yaw_dumbbell,kurtosis_yaw_forearm,skewness_yaw_forearm,amplitude_pitch_arm,amplitude_pitch_belt,amplitude_pitch_dumbbell,amplitude_pitch_forearm,amplitude_roll_arm,amplitude_roll_belt,amplitude_roll_dumbbell,amplitude_roll_forearm,amplitude_yaw_arm,amplitude_yaw_belt,amplitude_yaw_dumbbell,amplitude_yaw_forearm,avg_pitch_arm,avg_pitch_belt,avg_pitch_dumbbell,avg_pitch_forearm,avg_roll_arm,avg_roll_belt,avg_roll_dumbbell,avg_roll_forearm,avg_yaw_arm,avg_yaw_belt,avg_yaw_dumbbell,avg_yaw_forearm,kurtosis_picth_arm,kurtosis_picth_belt,kurtosis_picth_dumbbell,kurtosis_picth_forearm,kurtosis_roll_arm,kurtosis_roll_belt,kurtosis_roll_dumbbell,kurtosis_roll_forearm,kurtosis_yaw_arm,max_picth_arm,max_picth_belt,max_picth_dumbbell,max_picth_forearm,max_roll_arm,max_roll_belt,max_roll_dumbbell,max_roll_forearm,max_yaw_arm,max_yaw_belt,max_yaw_dumbbell,max_yaw_forearm,min_pitch_arm,min_pitch_belt,min_pitch_dumbbell,min_pitch_forearm,min_roll_arm,min_roll_belt,min_roll_dumbbell,min_roll_forearm,min_yaw_arm,min_yaw_belt,min_yaw_dumbbell,min_yaw_forearm,skewness_pitch_arm,skewness_pitch_dumbbell,skewness_pitch_forearm,skewness_roll_arm,skewness_roll_belt,skewness_roll_belt.1,skewness_roll_dumbbell,skewness_roll_forearm,skewness_yaw_arm,stddev_pitch_arm,stddev_pitch_belt,stddev_pitch_dumbbell,stddev_pitch_forearm,stddev_roll_arm,stddev_roll_belt,stddev_roll_dumbbell,stddev_roll_forearm,stddev_yaw_arm,stddev_yaw_belt,stddev_yaw_dumbbell,stddev_yaw_forearm,var_accel_arm,var_accel_dumbbell,var_accel_forearm,var_pitch_arm,var_pitch_belt,var_pitch_dumbbell,var_pitch_forearm,var_roll_arm,var_roll_belt,var_roll_dumbbell,var_roll_forearm,var_total_accel_belt,var_yaw_arm,var_yaw_belt,var_yaw_dumbbell,var_yaw_forearm) )
+testing <- subset( testing, select = -c(X,cvtd_timestamp,new_window,user_name,kurtosis_yaw_belt,skewness_yaw_belt,kurtosis_yaw_dumbbell,skewness_yaw_dumbbell,kurtosis_yaw_forearm,skewness_yaw_forearm,amplitude_pitch_arm,amplitude_pitch_belt,amplitude_pitch_dumbbell,amplitude_pitch_forearm,amplitude_roll_arm,amplitude_roll_belt,amplitude_roll_dumbbell,amplitude_roll_forearm,amplitude_yaw_arm,amplitude_yaw_belt,amplitude_yaw_dumbbell,amplitude_yaw_forearm,avg_pitch_arm,avg_pitch_belt,avg_pitch_dumbbell,avg_pitch_forearm,avg_roll_arm,avg_roll_belt,avg_roll_dumbbell,avg_roll_forearm,avg_yaw_arm,avg_yaw_belt,avg_yaw_dumbbell,avg_yaw_forearm,kurtosis_picth_arm,kurtosis_picth_belt,kurtosis_picth_dumbbell,kurtosis_picth_forearm,kurtosis_roll_arm,kurtosis_roll_belt,kurtosis_roll_dumbbell,kurtosis_roll_forearm,kurtosis_yaw_arm,max_picth_arm,max_picth_belt,max_picth_dumbbell,max_picth_forearm,max_roll_arm,max_roll_belt,max_roll_dumbbell,max_roll_forearm,max_yaw_arm,max_yaw_belt,max_yaw_dumbbell,max_yaw_forearm,min_pitch_arm,min_pitch_belt,min_pitch_dumbbell,min_pitch_forearm,min_roll_arm,min_roll_belt,min_roll_dumbbell,min_roll_forearm,min_yaw_arm,min_yaw_belt,min_yaw_dumbbell,min_yaw_forearm,skewness_pitch_arm,skewness_pitch_dumbbell,skewness_pitch_forearm,skewness_roll_arm,skewness_roll_belt,skewness_roll_belt.1,skewness_roll_dumbbell,skewness_roll_forearm,skewness_yaw_arm,stddev_pitch_arm,stddev_pitch_belt,stddev_pitch_dumbbell,stddev_pitch_forearm,stddev_roll_arm,stddev_roll_belt,stddev_roll_dumbbell,stddev_roll_forearm,stddev_yaw_arm,stddev_yaw_belt,stddev_yaw_dumbbell,stddev_yaw_forearm,var_accel_arm,var_accel_dumbbell,var_accel_forearm,var_pitch_arm,var_pitch_belt,var_pitch_dumbbell,var_pitch_forearm,var_roll_arm,var_roll_belt,var_roll_dumbbell,var_roll_forearm,var_total_accel_belt,var_yaw_arm,var_yaw_belt,var_yaw_dumbbell,var_yaw_forearm) )
+validation <- subset( validation, select = -c(X,cvtd_timestamp,new_window,user_name,kurtosis_yaw_belt,skewness_yaw_belt,kurtosis_yaw_dumbbell,skewness_yaw_dumbbell,kurtosis_yaw_forearm,skewness_yaw_forearm,amplitude_pitch_arm,amplitude_pitch_belt,amplitude_pitch_dumbbell,amplitude_pitch_forearm,amplitude_roll_arm,amplitude_roll_belt,amplitude_roll_dumbbell,amplitude_roll_forearm,amplitude_yaw_arm,amplitude_yaw_belt,amplitude_yaw_dumbbell,amplitude_yaw_forearm,avg_pitch_arm,avg_pitch_belt,avg_pitch_dumbbell,avg_pitch_forearm,avg_roll_arm,avg_roll_belt,avg_roll_dumbbell,avg_roll_forearm,avg_yaw_arm,avg_yaw_belt,avg_yaw_dumbbell,avg_yaw_forearm,kurtosis_picth_arm,kurtosis_picth_belt,kurtosis_picth_dumbbell,kurtosis_picth_forearm,kurtosis_roll_arm,kurtosis_roll_belt,kurtosis_roll_dumbbell,kurtosis_roll_forearm,kurtosis_yaw_arm,max_picth_arm,max_picth_belt,max_picth_dumbbell,max_picth_forearm,max_roll_arm,max_roll_belt,max_roll_dumbbell,max_roll_forearm,max_yaw_arm,max_yaw_belt,max_yaw_dumbbell,max_yaw_forearm,min_pitch_arm,min_pitch_belt,min_pitch_dumbbell,min_pitch_forearm,min_roll_arm,min_roll_belt,min_roll_dumbbell,min_roll_forearm,min_yaw_arm,min_yaw_belt,min_yaw_dumbbell,min_yaw_forearm,skewness_pitch_arm,skewness_pitch_dumbbell,skewness_pitch_forearm,skewness_roll_arm,skewness_roll_belt,skewness_roll_belt.1,skewness_roll_dumbbell,skewness_roll_forearm,skewness_yaw_arm,stddev_pitch_arm,stddev_pitch_belt,stddev_pitch_dumbbell,stddev_pitch_forearm,stddev_roll_arm,stddev_roll_belt,stddev_roll_dumbbell,stddev_roll_forearm,stddev_yaw_arm,stddev_yaw_belt,stddev_yaw_dumbbell,stddev_yaw_forearm,var_accel_arm,var_accel_dumbbell,var_accel_forearm,var_pitch_arm,var_pitch_belt,var_pitch_dumbbell,var_pitch_forearm,var_roll_arm,var_roll_belt,var_roll_dumbbell,var_roll_forearm,var_total_accel_belt,var_yaw_arm,var_yaw_belt,var_yaw_dumbbell,var_yaw_forearm) )
+
+#TEMP STEP
+pctraining <- subset( training, select = -c(classe))
+pcvalidation <- subset( validation, select = -c(classe))
+
+#FILLING IN MISSING VALUES
+for(i in 1:ncol(pctraining)){pctraining[is.na(pctraining[,i]), i] <- mean(pctraining[,i], na.rm = TRUE)}
+for(i in 1:ncol(testing)){testing[is.na(testing[,i]), i] <- mean(testing[,i], na.rm = TRUE)}
+for(i in 1:ncol(pcvalidation)){pcvalidation[is.na(pcvalidation[,i]), i] <- mean(pcvalidation[,i], na.rm = TRUE)}
+classe <- training$classe
+adelmo <- adelmotrain
+carlitos <- carlitostrain
+charles <- charlestrain
+eurico <- euricotrain
+jeremy <- jeremytrain
+#FINALIZING DATA
+training <- data.frame(pctraining,adelmo,carlitos,charles,eurico,jeremy,classe)
+classe <- validation$classe
+adelmo <- adelmovalidation
+carlitos <- carlitosvalidation
+charles <- charlesvalidation
+eurico <- euricovalidation
+jeremy <- jeremyvalidation
+validation <- data.frame(pcvalidation,adelmo,carlitos,charles,eurico,jeremy,classe)
+classe <- testing$classe
+adelmo <- adelmotest
+carlitos <- carlitostest
+charles <- charlestest
+eurico <- euricotest
+jeremy <- jeremytest
+testing <- data.frame(testing,adelmo,carlitos,charles,eurico,jeremy)
+training$classe <- as.factor(training$classe)
+testing$classe <- as.factor(testing$classe)
+
+#BOOSTING TRAINING
+gbmFit <- train(classe~.,method="gbm",data=training,verbose=FALSE)
+print(gbmFit)
+gbvalidation <- predict(gbFit,validation)
+gbTest <- predict(gbFit,testing)
+table(gbmValdt,validation$classe)
+
+#RANDOM FOREST TRAINING
+rfFit <-train(classe~.,data=training,preProcess=c("center","scale"),method="rf")
+getTree(rfFit$finalModel)
+rfvalidation <- predict(rfFit,validation)
+rfTest <- predict(rfFit,testing)
+table(rfValdt,validation$classe)
+```
+
